@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Keyboard Simulator 4.0</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#10152d,#24104a);color:white;text-align:center}
+.wrap{max-width:1100px;margin:auto;padding:20px}
+h1{font-size:42px;margin:5px}
+.stats{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:15px}
+.card,.panel{background:#ffffff12;border:1px solid #ffffff25;border-radius:16px;padding:15px;box-shadow:0 8px 25px #0005}
+.stat{min-width:140px}.big{font-size:25px;font-weight:bold}
+button{border:0;border-radius:12px;padding:13px 18px;margin:5px;background:#5b5bea;color:white;font-weight:bold;cursor:pointer}
+button:hover{filter:brightness(1.15)}button.off{background:#555}
+button.good{background:#20a060}.danger{background:#b33}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.key{font-size:40px;width:90px;height:90px;background:#292d55;border:2px solid #777}
+#pets{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.pet{padding:10px;border-radius:12px;background:#ffffff10}.equipped{outline:2px solid #20d080}
+.log{height:90px;overflow:auto;text-align:left;background:#0004;border-radius:10px;padding:8px}
+.small{font-size:13px;opacity:.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>⌨️ KEYBOARD SIMULATOR 4.0</h1>
+<div class="small">TYPE • GRIND • REBIRTH • ASCEND</div>
+
+<div class="stats">
+<div class="card stat">⚡ Power<div id="power" class="big">0</div></div>
+<div class="card stat">💰 Coins<div id="coins" class="big">0</div></div>
+<div class="card stat">🔄 Rebirths<div id="rebirths" class="big">0</div></div>
+<div class="card stat">👑 Ascensions<div id="ascensions" class="big">0</div></div>
+<div class="card stat">⌨️ Keyboard<div id="level" class="big">1</div></div>
+<div class="card stat">🔥 Multiplier<div id="mult" class="big">x1</div></div>
+</div>
+
+<div class="panel">
+<button class="key" onclick="pressKey()">A</button>
+<button class="key" onclick="pressKey()">S</button>
+<button class="key" onclick="pressKey()">D</button>
+<button class="key" onclick="pressKey()">F</button>
+<p>Press any keyboard key too!</p>
+<div id="gain"></div>
+</div>
+
+<div class="grid">
+<div class="panel">
+<h2>💰 Selling & Upgrades</h2>
+<button onclick="sell()">SELL POWER</button>
+<button onclick="upgradeKeyboard()">⬆️ Upgrade Keyboard</button>
+<p id="upgradeText"></p>
+</div>
+
+<div class="panel">
+<h2>🔄 Rebirth</h2>
+<p>Power needed: <b id="rebirthNeed">1,000</b></p>
+<button onclick="rebirth()">🔄 REBIRTH</button>
+<p class="small">Cooldown: 0.1 seconds</p>
+</div>
+
+<div class="panel">
+<h2>👑 Ascension</h2>
+<p>Requires <b>60 Rebirths</b></p>
+<button onclick="ascend()">👑 ASCEND</button>
+<p class="small">Each Ascension gives a permanent x3 multiplier.</p>
+</div>
+
+<div class="panel">
+<h2>🤖 Auto Systems</h2>
+<button id="autoUpgradeBtn" onclick="toggleAuto('upgrade')">AUTO UPGRADE: OFF</button>
+<button id="autoRebirthBtn" onclick="toggleAuto('rebirth')">AUTO REBIRTH: OFF</button>
+<button id="autoHatchBtn" onclick="toggleAuto('hatch')">AUTO HATCH: OFF</button>
+<button id="autoEquipBtn" onclick="toggleAuto('equip')">AUTO EQUIP BEST: OFF</button>
+<button id="autoAscendBtn" onclick="toggleAuto('ascend')">AUTO ASCEND: OFF</button>
+<button id="autoSellBtn" onclick="toggleAuto('sell')">AUTO SELL: OFF</button>
+</div>
+</div>
+
+<button id="inventoryBtn" onclick="toggleInventory()">🐾 OPEN INVENTORY</button>
+<div id="petsPanel" class="panel" style="margin-top:15px;display:none">
+<h2>🥚 Pets — Best at the Top</h2>
+<p>Hatch cost: <b>100 Coins</b> • Max equipped: <b>3</b></p>
+<button onclick="hatch()">🥚 Hatch Pet</button>
+<button onclick="equipBest()">⭐ Equip Best</button>
+<div id="pets"></div>
+</div>
+
+<div class="panel" style="margin-top:15px">
+<h3>Activity</h3><div id="log" class="log"></div>
+</div>
+</div>
+
+<script>
+let power=0, coins=0, rebirths=0, ascensions=0, level=1;
+let pets=[], equipped=[], auto={upgrade:false,rebirth:false,hatch:false,equip:false,ascend:false,sell:false};
+let lastRebirth=0;
+
+const petData=[
+{name:"👑 Keyboard King",mult:30,rarity:"Secret",chance:0.3},
+{name:"🌌 Galaxy Dragon",mult:15,rarity:"Secret",chance:0.7},
+{name:"👾 Void Monster",mult:8,rarity:"Mythic",chance:2},
+{name:"🐲 Shadow Dragon",mult:5,rarity:"Mythic",chance:5},
+{name:"🦊 Neon Fox",mult:3,rarity:"Legendary",chance:10},
+{name:"🐶 Golden Dog",mult:2.2,rarity:"Epic",chance:18},
+{name:"🐱 Cyber Cat",mult:1.6,rarity:"Rare",chance:25},
+{name:"🐭 Tiny Mouse",mult:1.2,rarity:"Common",chance:39}
+];
+
+function fmt(n){return Math.floor(n).toLocaleString()}
+function rebirthCost(){return 1000*Math.pow(2.25,rebirths)}
+function keyboardCost(){return Math.floor(100*Math.pow(1.65,level-1))}
+function petMult(){
+ let m=1; equipped.forEach(i=>{if(pets[i])m*=pets[i].mult}); return m;
+}
+function totalMult(){return petMult()*Math.pow(3,ascensions)}
+function logMsg(s){let e=document.getElementById("log");e.innerHTML="<div>"+s+"</div>"+e.innerHTML}
+function update(){
+ document.getElementById("power").textContent=fmt(power);
+ document.getElementById("coins").textContent=fmt(coins);
+ document.getElementById("rebirths").textContent=rebirths;
+ document.getElementById("ascensions").textContent=ascensions;
+ document.getElementById("level").textContent=level;
+ document.getElementById("mult").textContent="x"+totalMult().toFixed(1);
+ document.getElementById("rebirthNeed").textContent=fmt(rebirthCost());
+ document.getElementById("upgradeText").textContent="Next keyboard: "+fmt(keyboardCost())+" Coins";
+ renderPets();
+}
+function pressKey(){
+ let gain=Math.max(1,level)*totalMult();
+ power+=gain;
+ document.getElementById("gain").textContent="+"+fmt(gain)+" Power!";
+ update();
+}
+function sell(){
+ if(power>0){coins+=power;power=0;logMsg("💰 Sold your Power!");update()}
+}
+function upgradeKeyboard(){
+ let c=keyboardCost();
+ if(coins>=c){coins-=c;level++;logMsg("⌨️ Keyboard upgraded to level "+level+"!");update()}
+}
+function rebirth(){
+ let now=performance.now();
+ if(now-lastRebirth<100)return;
+ if(power>=rebirthCost()){
+   power=0;coins=0;level=1;rebirths++;lastRebirth=now;
+   logMsg("🔄 Rebirth "+rebirths+" complete!");
+   update();
+ }
+}
+function ascend(){
+ if(rebirths>=60){
+   ascensions++;rebirths=0;power=0;coins=0;level=1;
+   logMsg("👑 ASCENSION "+ascensions+"! Permanent x"+Math.pow(3,ascensions)+" multiplier!");
+   update();
+ }else logMsg("❌ You need 60 Rebirths to Ascend.");
+}
+function rollPet(){
+ let r=Math.random()*100,sum=0;
+ for(const p of petData){sum+=p.chance;if(r<sum)return p}
+ return petData[petData.length-1];
+}
+function hatch(){
+ if(coins<100)return;
+ coins-=100;
+ let p=rollPet();
+ pets.push({...p});
+ logMsg("🥚 You hatched "+p.name+" ("+p.rarity+" x"+p.mult+")!");
+ sortPets();
+ update();
+}
+function sortPets(){
+ // Preserve equipped pets while sorting strongest to weakest.
+ const equippedPets=equipped.map(i=>pets[i]).filter(Boolean);
+ pets.sort((a,b)=>b.mult-a.mult);
+ equipped=equippedPets.map(p=>pets.indexOf(p)).filter(i=>i>=0);
+}
+function toggleInventory(){
+ const panel=document.getElementById("petsPanel");
+ const btn=document.getElementById("inventoryBtn");
+ const opening=panel.style.display==="none";
+ if(opening){
+   sortPets();       // Sort again whenever inventory opens.
+   renderPets();
+   panel.style.display="block";
+   btn.textContent="🐾 CLOSE INVENTORY";
+ }else{
+   panel.style.display="none";
+   btn.textContent="🐾 OPEN INVENTORY";
+ }
+}
+function equipBest(){
+ sortPets();
+ equipped=[];
+ for(let i=0;i<Math.min(3,pets.length);i++)equipped.push(i);
+ logMsg("⭐ Equipped your 3 best pets!");
+ update();
+}
+function togglePet(i){
+ let pos=equipped.indexOf(i);
+ if(pos>=0)equipped.splice(pos,1);
+ else if(equipped.length<3)equipped.push(i);
+ else logMsg("❌ You can equip only 3 pets.");
+ update();
+}
+function renderPets(){
+ let box=document.getElementById("pets");
+ box.innerHTML="";
+ pets.forEach((p,i)=>{
+   let d=document.createElement("div");
+   d.className="pet"+(equipped.includes(i)?" equipped":"");
+   d.innerHTML="<b>"+p.name+"</b><br>"+p.rarity+" • x"+p.mult+
+   "<br><button onclick='togglePet("+i+")'>"+(equipped.includes(i)?"UNEQUIP":"EQUIP")+"</button>";
+   box.appendChild(d);
+ });
+ if(!pets.length)box.innerHTML="<p>No pets yet. Hatch one!</p>";
+}
+function toggleAuto(k){
+ auto[k]=!auto[k];
+ let labels={upgrade:"autoUpgradeBtn",rebirth:"autoRebirthBtn",hatch:"autoHatchBtn",equip:"autoEquipBtn",ascend:"autoAscendBtn",sell:"autoSellBtn"};
+ document.getElementById(labels[k]).textContent="AUTO "+k.toUpperCase()+" : "+(auto[k]?"ON":"OFF");
+ document.getElementById(labels[k]).className=auto[k]?"good":"off";
+}
+setInterval(()=>{
+ if(auto.upgrade && coins>=keyboardCost())upgradeKeyboard();
+ if(auto.sell && power>100000)sell();
+ if(auto.rebirth && power>=rebirthCost())rebirth();
+ if(auto.hatch && coins>=100)hatch();
+ if(auto.equip && pets.length) {
+   let before=equipped.join(",");
+   equipBest();
+   if(before===equipped.join(",")){} 
+ }
+ if(auto.ascend && rebirths>=60)ascend();
+},100);
+
+document.addEventListener("keydown",e=>{
+ if(["INPUT","TEXTAREA"].includes(document.activeElement.tagName))return;
+ pressKey();
+});
+update();
+logMsg("🎮 Welcome! Start typing to gain Power.");
+</script>
+</body>
+</html>
